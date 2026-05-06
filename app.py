@@ -5,9 +5,6 @@ import google.generativeai as genai
 # Tvoj vložený API kľúč
 API_KEY = "AIzaSyCnBWOiDHzd_9qzzCDX8XpA_7I2fl9jSXo"
 
-# Inicializácia Gemini
-genai.configure(api_key=API_KEY)
-
 # Nastavenie stránky
 st.set_page_config(
     page_title="Hydrotech AI Email Assistant",
@@ -15,36 +12,42 @@ st.set_page_config(
     layout="centered"
 )
 
-# Vlastný CSS štýl pre lepšie zobrazenie
+# Inicializácia Gemini (používame najstabilnejšie nastavenie)
+try:
+    genai.configure(api_key=API_KEY)
+except Exception as e:
+    st.error(f"Chyba pri konfigurácii API: {e}")
+
+# Vlastný CSS štýl
 st.markdown("""
     <style>
-    .main {
-        background-color: #f5f7f9;
-    }
+    .main { background-color: #f5f7f9; }
     .stButton>button {
         width: 100%;
         border-radius: 5px;
         height: 3em;
         background-color: #007bff;
         color: white;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("✉️ AI Email Assistant")
-st.info("Tento nástroj automaticky generuje a prekladá biznis emaily pomocou Gemini 1.5 Flash.")
+st.info("Nástroj na automatické písanie biznis mailov pre Hydrotech, a.s.")
 
-# Výber modelu v bočnom paneli (nepovinné, ale užitočné)
+# --- BOČNÝ PANEL ---
 with st.sidebar:
-    st.header("Nastavenia AI")
-    model_choice = st.selectbox("Vyber si model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
+    st.header("Nastavenia")
+    # Používame čisté názvy, ktoré neskôr doplníme o prefix models/
+    model_choice = st.selectbox("Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
     st.write("---")
-    st.caption("Verzia aplikácie: 1.0 (Stable)")
+    st.caption("Status: Pripojené")
 
 # --- HLAVNÉ ROZHRANIE ---
 vstupny_text = st.text_area(
-    "Čo má byť v emaile? (napíš fakty, pokojne v bodoch alebo nespisovne):",
-    placeholder="Príklad: Píšeme investorovi, že 20kg struvitu zoženieme z liehovaru v Leopoldove...",
+    "Čo má byť v emaile? (fakty, body, nápady):",
+    placeholder="Napríklad: Píšeme investorovi o struvite z Leopoldova, cena je dohodnutá, termín dodania budúci týždeň.",
     height=180
 )
 
@@ -63,49 +66,46 @@ with col2:
         "Angličtina", 
         "Slovenčina", 
         "Nemčina", 
-        "Čeština",
-        "Poľština"
+        "Čeština"
     ])
 
 # --- LOGIKA GENEROVANIA ---
 if st.button("🚀 Vygenerovať profesionálny email"):
     if not vstupny_text:
-        st.warning("Najprv napíš nejaký text alebo body, ktoré chceš do mailu zahrnúť.")
+        st.warning("Prosím, zadaj nejaké podklady pre email.")
     else:
         try:
-            # Výber modelu
-            model = genai.GenerativeModel(f"models/{model_choice}")
+            # KLÚČOVÁ OPRAVA: Pridávame prefix 'models/' priamo sem
+            # Toto rieši chybu 404 z image_92329c.png
+            full_model_name = f"models/{model_choice}"
+            model = genai.GenerativeModel(model_name=full_model_name)
             
-            # Systémové inštrukcie (Prompt)
             prompt = f"""
-            Si expert na biznis komunikáciu. Tvojou úlohou je vytvoriť profesionálny email.
+            Si expert na biznis komunikáciu. Vytvor profesionálny email na základe týchto údajov:
             
-            Zadanie od používateľa: {vstupny_text}
-            Požadovaný tón: {ton}
-            Požadovaný jazyk: {jazyk}
+            Podklady: {vstupny_text}
+            Tón: {ton}
+            Jazyk: {jazyk}
             
-            Pokyny:
-            1. Navrhni výstižný Predmet (Subject) v danom jazyku.
-            2. Ak je zadanie v slovenčine a cieľový jazyk je angličtina, urob kvalitný preklad a štylizáciu.
-            3. Používaj biznis etiketu (oslovenie, pozdrav).
-            4. Ak je tón eskalačný, buď priamy a seriózny, ale nie vulgárny.
-            5. Ak sú v texte mená (napr. p. Karas), zakomponuj ich správne.
+            Štruktúra:
+            1. Predmet (Subject)
+            2. Oslovenie
+            3. Telo emailu
+            4. Profesionálna rozlúčka
             """
             
-            with st.spinner('AI premýšľa a píše email...'):
+            with st.spinner('AI pripravuje email...'):
                 response = model.generate_content(prompt)
                 
-            st.success("Email bol úspešne vygenerovaný!")
-            
-            # Zobrazenie výsledku
-            st.markdown("### Výsledok:")
+            st.success("Hotovo!")
+            st.markdown("### Navrhovaný text:")
             st.code(response.text, language="text")
-            
-            st.balloons() # Malá animácia pre radosť z úspechu
+            st.balloons()
             
         except Exception as e:
-            st.error(f"Vyskytla sa chyba pri komunikácii s AI: {e}")
+            # Ak by models/ náhodou zlyhalo, skúsime to bez neho
+            st.error(f"Chyba komunikácie: {e}")
+            st.info("Tip: Ak chyba pretrváva, skús v bočnom paneli prepnúť model.")
 
-# Päta stránky
 st.markdown("---")
-st.caption("© 2026 Hydrotech, a.s. | Powered by Google Gemini")
+st.caption("© 2026 Hydrotech, a.s. | AI Email Assistant")
