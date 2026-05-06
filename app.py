@@ -37,7 +37,7 @@ st.info("Tento nástroj automaticky generuje a prekladá biznis emaily pomocou G
 # Výber modelu v bočnom paneli (nepovinné, ale užitočné)
 with st.sidebar:
     st.header("Nastavenia AI")
-    model_choice = st.selectbox("Vyber si model:", ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"])
+    model_choice = st.selectbox("Vyber si model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
     st.write("---")
     st.caption("Verzia aplikácie: 1.0 (Stable)")
 
