@@ -1,5 +1,12 @@
 import streamlit as st
-import google.generativeai as genai
+
+# ✅ DEBUG IMPORTU
+try:
+    import google.generativeai as genai
+    st.write("✅ Gemini import OK")
+except Exception as e:
+    st.error(f"❌ Import chyba: {e}")
+    st.stop()
 
 st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
 st.title("✉️ Hydrotech Email Assistant")
@@ -28,7 +35,7 @@ if st.button("🚀 Vygenerovať email"):
         st.warning("Najprv napíšte zadanie pre email.")
     else:
         try:
-            # Použijeme najnovší a najrýchlejší model
+            # ✅ upravený model (bez "models/")
             model = genai.GenerativeModel("gemini-1.5-flash")
             
             prompt = f"Si expert na biznis komunikáciu v spoločnosti Hydrotech. Napíš {ton} email v jazyku {jazyk} na základe tohto zadania: {vstup}"
@@ -42,4 +49,4 @@ if st.button("🚀 Vygenerovať email"):
             
         except Exception as e:
             st.error(f"Vyskytla sa chyba: {e}")
-            st.info("Ak tu stále vidíte chybu, počkajte pár minút, kým sa zmeny v Google Cloud naplno prejavia.")
+            st.info("Ak tu stále vidíte chybu, skontrolujte logy alebo requirements.txt.")
