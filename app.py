@@ -74,7 +74,7 @@ if st.button("🚀 Vygenerovať profesionálny email"):
     else:
         try:
             # Výber modelu
-            model = genai.GenerativeModel(model_choice)
+            model = genai.GenerativeModel(f"models/{model_choice}")
             
             # Systémové inštrukcie (Prompt)
             prompt = f"""
