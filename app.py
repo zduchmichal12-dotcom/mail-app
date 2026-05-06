@@ -1,59 +1,45 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="Hydrotech Gemini AI", page_icon="💎")
-st.title("💎 Hydrotech Email Assistant (Gemini)")
+st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
+st.title("✉️ Hydrotech Email Assistant")
 
-# 1. NAČÍTANIE KĽÚČA
+# --- NAČÍTANIE KĽÚČA ---
 api_key = st.secrets.get("GEMINI_API_KEY")
+
 if not api_key:
-    st.error("❌ GEMINI_API_KEY chýba v Secrets!")
+    st.error("❌ API kľúč sa nenašiel v nastaveniach (Secrets).")
     st.stop()
 
-# 2. KONFIGURÁCIA
+# Konfigurácia pripojenia
 genai.configure(api_key=api_key)
 
-# 3. DYNAMICKÁ DETEKCIA MODELOV (Tento blok vyrieši váš problém)
-@st.cache_resource
-def find_working_model():
-    try:
-        # Získame zoznam všetkých dostupných modelov pre váš kľúč
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_actions]
-        # Prioritné poradie modelov
-        preferred = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
-        for p in preferred:
-            if p in models:
-                return p
-        return models[0] if models else None
-    except Exception as e:
-        st.error(f"Chyba pri hľadaní modelov: {e}")
-        return None
+# --- ROZHRANIE APLIKÁCIE ---
+vstup = st.text_area("Zadanie pre email:", height=150, placeholder="Napr.: Potrebujem súrne dokumentáciu od investora...")
 
-working_model = find_working_model()
-
-if not working_model:
-    st.error("❌ Váš API kľúč nevidí žiadne modely. Skontrolujte povolenie 'Generative Language API' v Google Cloud.")
-    st.stop()
-
-st.sidebar.success(f"Aktívny model: {working_model}")
-
-# 4. ROZHRANIE
-vstup = st.text_area("Zadanie pre email:", height=150)
 col1, col2 = st.columns(2)
 with col1:
-    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Dôrazný"])
+    ton = st.selectbox("Tón komunikácie:", ["Profesionálny", "Priateľský", "Dôrazný / Eskalačný", "Stručný"])
 with col2:
-    jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
+    jazyk = st.selectbox("Cieľový jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
 
 if st.button("🚀 Vygenerovať email"):
     if not vstup:
-        st.warning("Zadajte text.")
+        st.warning("Najprv napíšte zadanie pre email.")
     else:
         try:
-            model = genai.GenerativeModel(working_model)
-            with st.spinner('Gemini generuje...'):
-                res = model.generate_content(f"Si expert v Hydrotech. Napíš {ton} email v jazyku {jazyk}: {vstup}")
-            st.success("Hotovo!")
-            st.code(res.text)
+            # Použijeme najnovší a najrýchlejší model
+            model = genai.GenerativeModel("models/gemini-1.5-flash")
+            
+            prompt = f"Si expert na biznis komunikáciu v spoločnosti Hydrotech. Napíš {ton} email v jazyku {jazyk} na základe tohto zadania: {vstup}"
+            
+            with st.spinner('AI pripravuje váš email...'):
+                response = model.generate_content(prompt)
+                
+            st.success("Hotovo! Email bol úspešne vygenerovaný.")
+            st.markdown("### Výsledok:")
+            st.code(response.text, language="text")
+            
         except Exception as e:
-            st.error(f"Chyba pri generovaní: {e}")
+            st.error(f"Vyskytla sa chyba: {e}")
+            st.info("Ak tu stále vidíte chybu, počkajte pár minút, kým sa zmeny v Google Cloud naplno prejavia.")
