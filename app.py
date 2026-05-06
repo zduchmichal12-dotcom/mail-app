@@ -1,45 +1,42 @@
 import streamlit as st
-import google.generativeai as genai
+from openai import OpenAI
 
-st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
-st.title("✉️ Hydrotech Email Assistant")
+st.set_page_config(page_title="Hydrotech AI (GPT)", page_icon="✉️")
+st.title("✉️ Hydrotech Email Assistant (GPT)")
 
-# --- NAČÍTANIE KĽÚČA ---
-api_key = st.secrets.get("GEMINI_API_KEY")
+# Načítanie OpenAI kľúča zo Secrets
+api_key = st.secrets.get("OPENAI_API_KEY")
 
 if not api_key:
-    st.error("❌ API kľúč sa nenašiel v nastaveniach (Secrets).")
+    st.error("❌ Chýba OPENAI_API_KEY v Secrets!")
     st.stop()
 
-# Konfigurácia pripojenia
-genai.configure(api_key=api_key)
+client = OpenAI(api_key=api_key)
 
-# --- ROZHRANIE APLIKÁCIE ---
-vstup = st.text_area("Zadanie pre email:", height=150, placeholder="Napr.: Potrebujem súrne dokumentáciu od investora...")
-
+vstup = st.text_area("Zadanie pre email:", height=150)
 col1, col2 = st.columns(2)
 with col1:
-    ton = st.selectbox("Tón komunikácie:", ["Profesionálny", "Priateľský", "Dôrazný / Eskalačný", "Stručný"])
+    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Dôrazný"])
 with col2:
-    jazyk = st.selectbox("Cieľový jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
+    # Tu môžeme pridať aj GPT-4o, ak máte zaplatený kredit
+    model_gpt = st.selectbox("Model:", ["gpt-4o-mini", "gpt-4o"])
 
 if st.button("🚀 Vygenerovať email"):
     if not vstup:
-        st.warning("Najprv napíšte zadanie pre email.")
+        st.warning("Zadajte text.")
     else:
         try:
-            # Použijeme najnovší a najrýchlejší model
-            model = genai.GenerativeModel("models/gemini-1.5-flash")
+            with st.spinner('ChatGPT rozmýšľa...'):
+                response = client.chat.completions.create(
+                    model=model_gpt,
+                    messages=[
+                        {"role": "system", "content": f"Si biznis asistent v Hydrotech. Píš v slovenčine, tón: {ton}."},
+                        {"role": "user", "content": vstup}
+                    ]
+                )
             
-            prompt = f"Si expert na biznis komunikáciu v spoločnosti Hydrotech. Napíš {ton} email v jazyku {jazyk} na základe tohto zadania: {vstup}"
-            
-            with st.spinner('AI pripravuje váš email...'):
-                response = model.generate_content(prompt)
-                
-            st.success("Hotovo! Email bol úspešne vygenerovaný.")
-            st.markdown("### Výsledok:")
-            st.code(response.text, language="text")
+            st.success("Hotovo!")
+            st.write(response.choices[0].message.content)
             
         except Exception as e:
-            st.error(f"Vyskytla sa chyba: {e}")
-            st.info("Ak tu stále vidíte chybu, počkajte pár minút, kým sa zmeny v Google Cloud naplno prejavia.")
+            st.error(f"Chyba: {e}")
