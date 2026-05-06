@@ -6,24 +6,28 @@ import time
 st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
 st.title("✉️ Hydrotech AI Assistant")
 
-# ------------------ API ------------------
+# ------------------ API KONFIGURÁCIA ------------------
 api_key = st.secrets.get("GEMINI_API_KEY")
 
 if not api_key:
-    st.error("❌ API kľúč sa nenašiel v Secrets.")
+    st.error("❌ API kľúč (GEMINI_API_KEY) sa nenašiel v Secrets.")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-# ------------------ SESSION STATE ------------------
-st.session_state.setdefault("last_call_time", 0)
-st.session_state.setdefault("cached_prompt", None)
-st.session_state.setdefault("cached_response", None)
+# ------------------ SESSION STATE (PAMÄŤ) ------------------
+if "last_call_time" not in st.session_state:
+    st.session_state.last_call_time = 0
+if "cached_prompt" not in st.session_state:
+    st.session_state.cached_prompt = None
+if "cached_response" not in st.session_state:
+    st.session_state.cached_response = None
 
-COOLDOWN_SECONDS = 20
+COOLDOWN_SECONDS = 10  # Čas v sekundách medzi generovaniami
 
-# ------------------ UI ------------------
-vstup = st.text_area("Zadanie pre email:", height=150)
+# ------------------ POUŽÍVATEĽSKÉ ROZHRANIE ------------------
+vstup = st.text_area("Zadanie pre email:", height=150, 
+                     placeholder="Napr.: Chcem požiadať o zaslanie projektovej dokumentácie...")
 
 col1, col2 = st.columns(2)
 
@@ -39,51 +43,59 @@ with col2:
         ["Slovenčina", "Angličtina", "Nemčina"]
     )
 
-# ------------------ GENEROVANIE ------------------
+# ------------------ LOGIKA GENEROVANIA ------------------
 if st.button("🚀 Vygenerovať email"):
 
     if not vstup:
-        st.warning("Zadaj text.")
+        st.warning("Prosím, zadajte text zadania.")
         st.stop()
 
     now = time.time()
 
+    # VYLADENÝ PROMPT (Inštrukcia pre AI, aby nedávala vysvetlivky)
     prompt = f"""
-Napíš {ton} email v jazyku {jazyk}.
+Si expert v spoločnosti Hydrotech. Napíš {ton} email v jazyku {jazyk} na základe zadania nižšie.
+
+STRIKTNÉ PRAVIDLO: 
+Vygeneruj VÝHRADNE čistý text emailu (predmet a telo). 
+Nepridávaj žiadne úvody, vysvetlivky, zoznamy s bodmi ani záverečné komentáre. 
+Výsledok musí začať predmetom bez podpisu.
 
 Zadanie:
 {vstup}
 """
 
-    # ------------------ CACHE (ZÁCHRANA API) ------------------
+    # 1. KONTROLA CACHE
     if prompt == st.session_state.cached_prompt:
-        st.info("♻️ Použitá cache (bez API volania)")
+        st.info("♻️ Použitá cache (rovnaké zadanie)")
         st.markdown("### ✉️ Výsledok:")
-        st.code(st.session_state.cached_response)
+        st.code(st.session_state.cached_response, language="text")
         st.stop()
 
-    # ------------------ RATE LIMIT ------------------
-    if now - st.session_state.last_call_time < COOLDOWN_SECONDS:
-        st.warning("⏳ Počkaj pár sekúnd pred ďalším generovaním.")
+    # 2. KONTROLA RATE LIMITU
+    elapsed = now - st.session_state.last_call_time
+    if elapsed < COOLDOWN_SECONDS:
+        st.warning(f"⏳ Počkaj ešte {int(COOLDOWN_SECONDS - elapsed)} sekúnd.")
         st.stop()
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        # Používame model, ktorý máš potvrdený ako funkčný
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
 
-        with st.spinner("Generujem email..."):
+        with st.spinner("AI generuje čistý email..."):
             response = model.generate_content(prompt)
 
-        # uloženie cache
+        # Uloženie do pamäte
         st.session_state.cached_prompt = prompt
         st.session_state.cached_response = response.text
         st.session_state.last_call_time = now
 
-        st.success("Hotovo!")
+        st.success("Email úspešne vygenerovaný!")
         st.markdown("### ✉️ Výsledok:")
-        st.code(response.text)
+        st.code(response.text, language="text")
 
     except Exception as e:
-        if "429" in str(e):
-            st.error("⏳ API limit (počkaj chvíľu).")
-        else:
-            st.error(f"Chyba: {e}")
+        st.error(f"Vyskytla sa chyba: {e}")
+
+st.divider()
+st.caption("© 2026 Hydrotech, a.s. | Model: Gemini 2.5 Flash")
