@@ -5,43 +5,33 @@ import google.generativeai as genai
 API_KEY = "AIzaSyCnBWOiDHzd_9qzzCDX8XpA_7I2fl9jSXo"
 genai.configure(api_key=API_KEY)
 
-st.set_page_config(page_title="Hydrotech Email AI", page_icon="✉️")
-
+st.set_page_config(page_title="Hydrotech AI", page_icon="✉️")
 st.title("✉️ Hydrotech Email Assistant")
 
-# --- VÝBER MODELU (OPRAVENÉ NÁZVY) ---
-with st.sidebar:
-    st.header("Nastavenia")
-    # Tieto názvy sú overené ako funkčné pre rok 2026
-    model_choice = st.selectbox("Vyber si model:", [
-        "gemini-1.5-flash-002",  # Najstabilnejšia verzia 1.5
-        "gemini-1.5-pro-002",    # Výkonnejšia verzia 1.5
-        "gemini-2.0-flash-exp"   # Experimentálna 2.0 (menej náchylná na 429)
-    ])
-    st.caption("Tip: Ak jeden nejde, skús druhý v zozname.")
+# ROZHRANIE
+vstup = st.text_area("Zadanie pre email:")
 
-# --- ROZHRANIE ---
-vstupny_text = st.text_area("Zadanie pre email:", height=150)
-jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
-
-if st.button("🚀 Generovať"):
-    if not vstupny_text:
-        st.warning("Napíš niečo do poľa.")
+if st.button("🚀 Generovať email"):
+    if not vstup:
+        st.error("Napíš zadanie.")
     else:
         try:
-            # Tu je tá dôležitá zmena v názve modelu
-            model = genai.GenerativeModel(model_name=model_choice)
+            # Skúsime absolútne najzákladnejší názov bez prefixov
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            with st.spinner('AI generuje...'):
-                response = model.generate_content(f"Napíš profesionálny email v jazyku {jazyk}: {vstupny_text}")
+            with st.spinner('Generujem...'):
+                res = model.generate_content(f"Napíš profesionálny email: {vstup}")
             
-            st.success("Email je hotový!")
-            st.code(response.text, language="text")
+            st.success("Hotovo!")
+            st.code(res.text)
             
         except Exception as e:
-            # Ak to vyhodí chybu, aplikácia ti teraz presne povie prečo
             st.error(f"Chyba: {e}")
-            if "429" in str(e):
-                st.info("Limit vyčerpaný. Počkaj 60 sekúnd alebo prepni na model 1.5-flash-002.")
-            elif "404" in str(e):
-                st.info("Model nenájdený. Skús vybrať inú verziu v bočnom paneli.")
+            
+            # TENTO BLOK NÁM POVIE PRAVDU, AK TO ZLYHÁ:
+            st.write("Hľadám modely, ktoré váš kľúč skutočne vidí...")
+            try:
+                m_list = [m.name for m in genai.list_models() if 'generateContent' in m.supported_actions]
+                st.info(f"Skúste do kódu namiesto 'gemini-1.5-flash' napísať jeden z týchto: {m_list}")
+            except:
+                st.warning("Nepodarilo sa načítať ani zoznam modelov. Skontrolujte, či je API kľúč aktívny.")
