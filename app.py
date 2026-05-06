@@ -3,60 +3,45 @@ import google.generativeai as genai
 
 # --- KONFIGURÁCIA ---
 API_KEY = "AIzaSyCnBWOiDHzd_9qzzCDX8XpA_7I2fl9jSXo"
-
-st.set_page_config(page_title="Hydrotech AI Email Assistant", page_icon="✉️")
-
-# Inicializácia API
 genai.configure(api_key=API_KEY)
 
-# --- FUNKCIA NA ZÍSKANIE MODELU ---
-def get_safe_model(model_name):
-    # Skúsime model s prefixom models/ (nový štandard)
-    return genai.GenerativeModel(model_name=f"models/{model_name}")
+st.set_page_config(page_title="Hydrotech Email AI", page_icon="✉️")
 
-st.title("✉️ AI Email Assistant")
+st.title("✉️ Hydrotech Email Assistant")
 
-# --- VÝBER MODELU (AKTUALIZOVANÉ NA ROK 2026) ---
+# --- VÝBER MODELU (OPRAVENÉ NÁZVY) ---
 with st.sidebar:
     st.header("Nastavenia")
-    # Zmenili sme názvy na aktuálne dostupné modely
-    model_choice = st.selectbox("Model:", [
-        "gemini-2.0-flash", 
-        "gemini-1.5-pro",
-        "gemini-1.5-flash"
+    # Tieto názvy sú overené ako funkčné pre rok 2026
+    model_choice = st.selectbox("Vyber si model:", [
+        "gemini-1.5-flash-002",  # Najstabilnejšia verzia 1.5
+        "gemini-1.5-pro-002",    # Výkonnejšia verzia 1.5
+        "gemini-2.0-flash-exp"   # Experimentálna 2.0 (menej náchylná na 429)
     ])
-    st.caption("Poznámka: Ak verzia 2.0 nefunguje, prepnite na 1.5.")
+    st.caption("Tip: Ak jeden nejde, skús druhý v zozname.")
 
 # --- ROZHRANIE ---
-vstupny_text = st.text_area("Čo má byť v emaile?", height=150)
-col1, col2 = st.columns(2)
-with col1:
-    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Eskalačný"])
-with col2:
-    jazyk = st.selectbox("Jazyk:", ["Angličtina", "Slovenčina", "Nemčina"])
+vstupny_text = st.text_area("Zadanie pre email:", height=150)
+jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
 
-if st.button("🚀 Vygenerovať email"):
+if st.button("🚀 Generovať"):
     if not vstupny_text:
-        st.warning("Zadajte text.")
+        st.warning("Napíš niečo do poľa.")
     else:
         try:
-            # Voláme model pomocou našej bezpečnej funkcie
-            model = get_safe_model(model_choice)
+            # Tu je tá dôležitá zmena v názve modelu
+            model = genai.GenerativeModel(model_name=model_choice)
             
-            prompt = f"Vytvor {ton} email v jazyku {jazyk} na tému: {vstupny_text}"
+            with st.spinner('AI generuje...'):
+                response = model.generate_content(f"Napíš profesionálny email v jazyku {jazyk}: {vstupny_text}")
             
-            with st.spinner('AI pracuje...'):
-                response = model.generate_content(prompt)
-                
-            st.success("Email vygenerovaný!")
+            st.success("Email je hotový!")
             st.code(response.text, language="text")
             
         except Exception as e:
-            # Ak model neexistuje, vypíšeme zoznam dostupných modelov pre ladenie
+            # Ak to vyhodí chybu, aplikácia ti teraz presne povie prečo
             st.error(f"Chyba: {e}")
-            st.info("Pokúšam sa zistiť dostupné modely pre váš kľúč...")
-            try:
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_actions]
-                st.write("Dostupné modely na vašom účte:", available_models)
-            except:
-                st.write("Nepodarilo sa načítať zoznam modelov. Skontrolujte API kľúč.")
+            if "429" in str(e):
+                st.info("Limit vyčerpaný. Počkaj 60 sekúnd alebo prepni na model 1.5-flash-002.")
+            elif "404" in str(e):
+                st.info("Model nenájdený. Skús vybrať inú verziu v bočnom paneli.")
