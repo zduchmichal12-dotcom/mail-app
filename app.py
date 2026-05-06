@@ -29,7 +29,7 @@ if st.button("🚀 Vygenerovať email"):
     else:
         try:
             # Použijeme najnovší a najrýchlejší model
-            model = genai.GenerativeModel("models/gemini-1.5-flash")
+            model = genai.GenerativeModel("gemini-1.5-flash")
             
             prompt = f"Si expert na biznis komunikáciu v spoločnosti Hydrotech. Napíš {ton} email v jazyku {jazyk} na základe tohto zadania: {vstup}"
             
