@@ -1,51 +1,46 @@
 import streamlit as st
 import google.generativeai as genai
+from google.api_core import exceptions
 
-st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
+st.set_page_config(page_title="Hydrotech Fix", page_icon="✉️")
 st.title("✉️ Hydrotech Email Assistant")
 
 # Načítanie kľúča
 api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
-    st.error("❌ API kľúč chýba v Secrets.")
+    st.error("Chýba kľúč v Secrets!")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-# ROZHRANIE
-vstup = st.text_area("Zadanie pre email:", height=150, placeholder="Napr.: Chcem dokumentáciu od investora...")
-col1, col2 = st.columns(2)
-with col1:
-    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Dôrazný"])
-with col2:
-    jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
+vstup = st.text_area("Zadanie:")
 
-if st.button("🚀 Vygenerovať email"):
-    if not vstup:
-        st.warning("Najprv napíšte zadanie.")
-    else:
-        # ZOZNAM MODELOV NA TESTOVANIE (riešenie pre 404)
-        mozne_modely = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-        uspech = False
-        
-        for model_name in mozne_modely:
-            if uspech: break
-            try:
-                model = genai.GenerativeModel(model_name)
-                with st.spinner(f'Skúšam generovať cez {model_name}...'):
-                    res = model.generate_content(f"Si expert v Hydrotech. Napíš {ton} email v jazyku {jazyk}: {vstup}")
-                    
-                st.success(f"Email vygenerovaný úspešne!")
-                st.markdown("### Výsledok:")
-                st.code(res.text)
-                uspech = True
-            except Exception as e:
-                # Ak model neexistuje (404), skúsi ďalší v poradí
-                if "404" in str(e):
-                    continue
-                else:
-                    st.error(f"Iná chyba: {e}")
-                    break
-        
-        if not uspech:
-            st.error("❌ Žiadny z modelov nefunguje. Skúste v Google AI Studio vytvoriť úplne nový API kľúč.")
+if st.button("🚀 Generovať"):
+    # Skúsime tieto 3 konkrétne cesty, ktoré fungujú v EÚ
+    test_models = ["gemini-1.5-flash", "gemini-1.5-pro", "models/gemini-1.0-pro"]
+    
+    found_success = False
+    
+    for m_name in test_models:
+        try:
+            model = genai.GenerativeModel(model_name=m_name)
+            # Skúšobný krátky prompt
+            response = model.generate_content(f"Napiš krátky profesionálny email: {vstup}")
+            
+            st.success(f"✅ ÚSPECH! Model '{m_name}' funguje.")
+            st.code(response.text)
+            found_success = True
+            break # Ak jeden funguje, končíme
+            
+        except exceptions.NotFound:
+            st.warning(f"❌ Model '{m_name}' nebol nájdený (404).")
+        except exceptions.PermissionDenied:
+            st.error(f"🚫 Model '{m_name}': Prístup zamietnutý (403). Váš kľúč nemá povolenie.")
+        except exceptions.ResourceExhausted:
+            st.error(f"⏳ Model '{m_name}': Prekročený limit (429). Počkajte minútu.")
+        except Exception as e:
+            st.error(f"⚠️ Model '{m_name}' zlyhal: {str(e)}")
+
+    if not found_success:
+        st.error("Žiadny model neuspel. Pravdepodobne máte v Google AI Studio nastavený kľúč v projekte, ktorý nemá povolené Generative AI API.")
+        st.info("TIP: Skúste v Google AI Studio vytvoriť kľúč cez 'Create API key in NEW project' pod súkromným @gmail.com účtom.")
