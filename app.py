@@ -1,71 +1,59 @@
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 
-# Nastavenie stránky
-st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
+st.set_page_config(page_title="Hydrotech Gemini AI", page_icon="💎")
+st.title("💎 Hydrotech Email Assistant (Gemini)")
 
-# CSS pre krajší vzhľad
-st.markdown("""
-    <style>
-    .stTextArea textarea { font-size: 1.1rem; }
-    .stCode { background-color: #f0f2f6; }
-    </style>
-    """, unsafe_allow_config=True)
-
-st.title("✉️ Hydrotech Email Assistant")
-
-# Načítanie OpenAI kľúča (v Secrets musí byť OPENAI_API_KEY)
-api_key = st.secrets.get("OPENAI_API_KEY")
-
+# 1. NAČÍTANIE KĽÚČA
+api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
-    st.error("❌ API kľúč nenájdený. Skontroluj 'Settings -> Secrets' v Streamlite.")
+    st.error("❌ GEMINI_API_KEY chýba v Secrets!")
     st.stop()
 
-client = OpenAI(api_key=api_key)
+# 2. KONFIGURÁCIA
+genai.configure(api_key=api_key)
 
-# Vstup od používateľa
-vstup = st.text_area("Čo má byť obsahom emailu?", height=200, 
-                     placeholder="Napr.: Chcem požiadať investora o zaslanie projektovej dokumentácie k čistiarni odpadových vôd, ktorú sľúbil minulý týždeň.")
+# 3. DYNAMICKÁ DETEKCIA MODELOV (Tento blok vyrieši váš problém)
+@st.cache_resource
+def find_working_model():
+    try:
+        # Získame zoznam všetkých dostupných modelov pre váš kľúč
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_actions]
+        # Prioritné poradie modelov
+        preferred = ["models/gemini-1.5-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
+        for p in preferred:
+            if p in models:
+                return p
+        return models[0] if models else None
+    except Exception as e:
+        st.error(f"Chyba pri hľadaní modelov: {e}")
+        return None
 
+working_model = find_working_model()
+
+if not working_model:
+    st.error("❌ Váš API kľúč nevidí žiadne modely. Skontrolujte povolenie 'Generative Language API' v Google Cloud.")
+    st.stop()
+
+st.sidebar.success(f"Aktívny model: {working_model}")
+
+# 4. ROZHRANIE
+vstup = st.text_area("Zadanie pre email:", height=150)
 col1, col2 = st.columns(2)
 with col1:
-    ton = st.selectbox("Tón komunikácie:", 
-                       ["Profesionálny a formálny", "Priateľský", "Dôrazný (Urgentný)", "Stručný / Technický"])
+    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Dôrazný"])
 with col2:
-    jazyk = st.selectbox("Jazyk emailu:", ["Slovenčina", "Angličtina", "Nemčina"])
+    jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
 
 if st.button("🚀 Vygenerovať email"):
     if not vstup:
-        st.warning("Prosím, zadajte zadanie pre email.")
+        st.warning("Zadajte text.")
     else:
         try:
-            with st.spinner('ChatGPT pripravuje návrh...'):
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",  # Najlepší pomer cena/výkon
-                    messages=[
-                        {"role": "system", "content": f"Si skúsený biznis asistent v spoločnosti Hydrotech, ktorá sa zaoberá čistením odpadových vôd. Tvojou úlohou je písať jasné, gramaticky správne a profesionálne emaily v jazyku: {jazyk}. Tón emailu musí byť: {ton}."},
-                        {"role": "user", "content": f"Napíš email na základe tohto zadania: {vstup}"}
-                    ],
-                    temperature=0.7 # Kreativita vs. presnosť
-                )
-            
-            email_text = response.choices[0].message.content
-            
-            st.success("Email bol úspešne vygenerovaný!")
-            st.markdown("---")
-            st.subheader("Návrh emailu:")
-            st.write(email_text)
-            
-            # Tlačidlo na skopírovanie (zobrazí kódový blok)
-            st.info("Nižšie môžete text pohodlne skopírovať:")
-            st.code(email_text, language="text")
-            
+            model = genai.GenerativeModel(working_model)
+            with st.spinner('Gemini generuje...'):
+                res = model.generate_content(f"Si expert v Hydrotech. Napíš {ton} email v jazyku {jazyk}: {vstup}")
+            st.success("Hotovo!")
+            st.code(res.text)
         except Exception as e:
-            if "insufficient_quota" in str(e):
-                st.error("❌ Chyba: Nemáte dobitý kredit na OpenAI!")
-                st.info("Prejdite do 'Settings -> Billing' na platform.openai.com a pridajte aspoň 5$.")
-            else:
-                st.error(f"Vyskytla sa neočakávaná chyba: {e}")
-
-st.divider()
-st.caption("© 2026 Hydrotech, a.s. | Powered by OpenAI GPT-4o-mini")
+            st.error(f"Chyba pri generovaní: {e}")
