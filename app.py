@@ -1,80 +1,58 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- BEZPEČNÁ KONFIGURÁCIA ---
+# --- KONFIGURÁCIA CEZ SECRETS ---
 try:
-    # Streamlit si vytiahne kľúč z okna, ktoré ste videli na image_91bb79.png
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception as e:
-    st.error("Chýba API kľúč v Secrets! Nastavte ho podľa image_91bb79.png.")
+    st.error("Nastavte GEMINI_API_KEY v Secrets!")
     st.stop()
 
-# Nastavenie vzhľadu stránky
-st.set_page_config(page_title="Hydrotech AI Assistant", page_icon="✉️")
-
+st.set_page_config(page_title="Hydrotech AI", page_icon="✉️")
 st.title("✉️ Hydrotech Email Assistant")
-st.markdown("---")
 
-# --- HLAVNÉ ROZHRANIE ---
-vstupny_text = st.text_area(
-    "Čo má byť v emaile? (zadajte fakty alebo body):",
-    placeholder="Napr.: Píšeme investorovi, že dokument o struvite nemáme, ale preverujeme liehovar v Leopoldove...",
-    height=150
-)
+# --- DYNAMICKÉ ZÍSKANIE MODELU (Riešenie pre 404) ---
+@st.cache_resource
+def get_available_model():
+    try:
+        # Získame zoznam všetkých modelov, ktoré podporujú generovanie obsahu
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_actions]
+        # Vyberieme ten, ktorý vyzerá ako flash (rýchly), inak prvý v poradí
+        flash_models = [m for m in models if 'flash' in m]
+        return flash_models[0] if flash_models else models[0]
+    except:
+        return "models/gemini-1.5-flash" # Posledná záchrana
 
-# Výber tónu a jazyka vedľa seba
+working_model_name = get_available_model()
+
+# --- ROZHRANIE ---
+vstupny_text = st.text_area("Čo má byť v emaile?", height=150)
+
 col1, col2 = st.columns(2)
-
 with col1:
-    ton = st.selectbox("Tón komunikácie:", [
-        "Profesionálny a obchodný", 
-        "Priateľský a neformálny", 
-        "Dôrazný / Eskalačný", 
-        "Stručný a technický"
-    ])
-
+    ton = st.selectbox("Tón:", ["Profesionálny", "Priateľský", "Eskalačný", "Technický"])
 with col2:
-    jazyk = st.selectbox("Cieľový jazyk:", [
-        "Slovenčina",
-        "Angličtina", 
-        "Nemčina", 
-        "Poľština"
-    ])
+    jazyk = st.selectbox("Jazyk:", ["Slovenčina", "Angličtina", "Nemčina"])
 
-# --- LOGIKA GENEROVANIA ---
 if st.button("🚀 Vygenerovať email"):
     if not vstupny_text:
-        st.warning("Najprv napíšte zadanie pre email.")
+        st.warning("Zadajte text.")
     else:
         try:
-            # Používame stabilný model gemini-1.5-flash
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Použijeme model, ktorý sme našli ako funkčný
+            model = genai.GenerativeModel(working_model_name)
             
-            # Detailný pokyn pre AI (Prompt)
-            prompt = f"""
-            Si expert na biznis komunikáciu v spoločnosti Hydrotech. 
-            Tvojou úlohou je napísať email na základe týchto podkladov: {vstupny_text}
-            Požadovaný tón: {ton}
-            Cieľový jazyk: {jazyk}
+            prompt = f"Si biznis asistent v Hydrotech. Napíš {ton} email v jazyku {jazyk}: {vstupny_text}"
             
-            Email musí obsahovať Predmet (Subject), profesionálne oslovenie a štruktúrované telo.
-            """
-            
-            with st.spinner('AI pripravuje váš email...'):
+            with st.spinner(f'AI pracuje (model: {working_model_name})...'):
                 response = model.generate_content(prompt)
                 
-            st.success("Email bol úspešne vytvorený!")
-            st.markdown("### Výsledok:")
+            st.success("Email vygenerovaný!")
             st.code(response.text, language="text")
-            st.balloons()
             
         except Exception as e:
-            # Ak by Google opäť hlásil chybu 429 (limit), vypíšeme to zrozumiteľne
-            if "429" in str(e):
-                st.error("Prekročený limit bezplatnej verzie. Počkajte prosím 60 sekúnd.")
-            else:
-                st.error(f"Vyskytla sa chyba: {e}")
+            st.error(f"Chyba: {e}")
+            st.info("Skúste v AI Studio vytvoriť úplne nový API kľúč.")
 
-st.markdown("---")
-st.caption("© 2026 Hydrotech, a.s. | Powered by Google Gemini 1.5")
+st.caption(f"Aktuálne pripojený model: {working_model_name}")
